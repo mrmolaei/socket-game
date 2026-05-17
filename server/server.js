@@ -6,16 +6,12 @@ const cors = require("cors");
 const app = express();
 app.use(cors());
 
-app.get("/", (req, res) => {
-  res.send("Socket server is running");
-});
+app.get("/", (req, res) => res.send("Socket server is running"));
 
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: { origin: "*" },
-});
+const io = new Server(server, { cors: { origin: "*" } });
 
-// ─── Questions & traits ───────────────────────────────────────────────────────
+// ─── Questions (4 active) ─────────────────────────────────────────────────────
 
 const QUESTIONS = [
   {
@@ -40,16 +36,6 @@ const QUESTIONS = [
   },
   {
     id: 3,
-    text: "تصور کن در یک شرکت بزرگ کار می‌کنی و متوجه می‌شوی همکارت ایده تو را دزدیده. چه کار می‌کنی؟",
-    options: [
-      { label: "الف", text: "مستقیم و بدون ترس حقیقت را جلوی همه مطرح می‌کنم.", traits: ["courage", "decisiveness"] },
-      { label: "ب", text: "آرام مدرک جمع می‌کنم تا در زمان مناسب ثابتش کنم.", traits: ["logic", "discipline"] },
-      { label: "ج", text: "سکوت می‌کنم اما از آن به عنوان انگیزه‌ای برای قوی‌تر شدن استفاده می‌کنم.", traits: ["emotional-control", "ambition"] },
-      { label: "د", text: "اول سعی می‌کنم بفهمم چرا چنین کاری کرده و با خودش صحبت کنم.", traits: ["empathy", "adaptability"] },
-    ],
-  },
-  {
-    id: 4,
     text: "در یک تعطیلات طولانی ترجیح می‌دهی بیشتر وقتت را چگونه بگذرانی؟",
     options: [
       { label: "الف", text: "آشنا شدن با آدم‌های جدید", traits: ["sociability", "adaptability"] },
@@ -59,17 +45,7 @@ const QUESTIONS = [
     ],
   },
   {
-    id: 5,
-    text: "اگر وارد یک کتابخانه بسیار قدیمی شوی، اول دنبال چه می‌گردی؟",
-    options: [
-      { label: "الف", text: "کتاب‌های ممنوعه و ناشناخته", traits: ["curiosity", "courage"] },
-      { label: "ب", text: "نقشه‌ها و اسناد تاریخی", traits: ["logic", "discipline"] },
-      { label: "ج", text: "داستان‌ها و افسانه‌های عجیب", traits: ["creativity", "intuition"] },
-      { label: "د", text: "بخشی که مردم دور هم جمع شده‌اند و بحث می‌کنند", traits: ["sociability", "leadership"] },
-    ],
-  },
-  {
-    id: 6,
+    id: 4,
     text: "اگر بتوانی فقط یک ویژگی را در خودت قوی‌تر کنی، کدام را انتخاب می‌کنی؟",
     options: [
       { label: "الف", text: "شجاعت برای انجام کارهای بزرگ", traits: ["courage", "ambition"] },
@@ -78,70 +54,70 @@ const QUESTIONS = [
       { label: "د", text: "ذهنی خلاق برای ساخت چیزهای جدید", traits: ["creativity", "curiosity"] },
     ],
   },
-  {
-    id: 7,
-    text: "ساعتی پیدا می‌کنی که می‌تواند زمان را به عقب برگرداند، اما هر بار ده سال از عمرت کم می‌کند. چه می‌کنی؟",
-    options: [
-      { label: "الف", text: "از آن برای موفقیت استفاده می‌کنم.", traits: ["ambition", "decisiveness"] },
-      { label: "ب", text: "فقط برای نجات دیگران استفاده می‌کنم.", traits: ["empathy", "responsibility"] },
-      { label: "ج", text: "اصلاً لمسش نمی‌کنم.", traits: ["discipline", "emotional-control"] },
-      { label: "د", text: "مدام آزمایشش می‌کنم تا محدودیتش را بفهمم.", traits: ["curiosity", "adventurousness"] },
-    ],
-  },
-  {
-    id: 8,
-    text: "بهترین دوستت اشتباه بزرگی کرده که پنهان کردنش به یک بی‌گناه آسیب می‌زند. چه می‌کنی؟",
-    options: [
-      { label: "الف", text: "حقیقت را می‌گویم، حتی اگر دوستم را از دست بدهم.", traits: ["responsibility", "idealism"] },
-      { label: "ب", text: "از دوستم می‌خواهم خودش حقیقت را اعتراف کند و کنارش می‌مانم.", traits: ["loyalty", "leadership"] },
-      { label: "ج", text: "سعی می‌کنم راه‌حلی پیدا کنم که کمترین آسیب را به همه بزند.", traits: ["creativity", "empathy"] },
-      { label: "د", text: "تا زمانی که مطمئن نشوم چه کسی واقعاً مقصر است، تصمیم نمی‌گیرم.", traits: ["patience", "logic"] },
-    ],
-  },
-  {
-    id: 9,
-    text: "فقط یک سفینه برای ترک زمین باقی مانده و ظرفیتش محدود است. چه می‌کنی؟",
-    options: [
-      { label: "الف", text: "خانواده و دوستانم را نجات می‌دهم.", traits: ["loyalty", "empathy"] },
-      { label: "ب", text: "دانشمندان و افراد مفید را انتخاب می‌کنم.", traits: ["logic", "responsibility"] },
-      { label: "ج", text: "برای گرفتن جایگاه می‌جنگم.", traits: ["competitiveness", "ambition"] },
-      { label: "د", text: "می‌مانم تا به دیگران کمک کنم.", traits: ["idealism", "leadership"] },
-    ],
-  },
-  {
-    id: 10,
-    text: "اگر یک روز با یک قدرت ماورایی از خواب بیدار شوی، دوست داری صاحب چه قدرتی باشی؟",
-    options: [
-      { label: "الف", text: "توانایی دیدن آینده و اتفاقاتی که هنوز رخ نداده‌اند.", traits: ["intuition", "decisiveness"] },
-      { label: "ب", text: "توانایی کنترل ذهن و متقاعد کردن دیگران فقط با چند جمله.", traits: ["leadership", "ambition"] },
-      { label: "ج", text: "توانایی سفر آزادانه به هر نقطه از جهان در یک لحظه.", traits: ["independence", "adventurousness"] },
-      { label: "د", text: "بتوانی هر زمان که بخواهی کاملاً ناپدید شوی.", traits: ["independence", "emotional-control"] },
-    ],
-  },
 ];
 
 const TRAIT_LABELS = {
-  leadership: "رهبری",
-  ambition: "جاه‌طلبی",
-  creativity: "خلاقیت",
-  curiosity: "کنجکاوی",
-  empathy: "همدلی",
-  sociability: "اجتماعی بودن",
-  adventurousness: "ماجراجویی",
-  independence: "استقلال",
-  intuition: "شهود",
-  "emotional-control": "کنترل احساسات",
-  patience: "صبر",
-  courage: "شجاعت",
-  decisiveness: "قدرت تصمیم‌گیری",
-  logic: "منطق",
-  discipline: "نظم و انضباط",
-  adaptability: "انعطاف‌پذیری",
-  responsibility: "مسئولیت‌پذیری",
-  loyalty: "وفاداری",
-  idealism: "آرمان‌گرایی",
-  competitiveness: "رقابت‌طلبی",
+  leadership: "رهبری", ambition: "جاه‌طلبی", creativity: "خلاقیت",
+  curiosity: "کنجکاوی", empathy: "همدلی", sociability: "اجتماعی بودن",
+  adventurousness: "ماجراجویی", independence: "استقلال", intuition: "شهود",
+  "emotional-control": "کنترل احساسات", patience: "صبر", courage: "شجاعت",
+  decisiveness: "قدرت تصمیم‌گیری", logic: "منطق", discipline: "نظم و انضباط",
+  adaptability: "انعطاف‌پذیری", responsibility: "مسئولیت‌پذیری",
+  loyalty: "وفاداری", idealism: "آرمان‌گرایی", competitiveness: "رقابت‌طلبی",
 };
+
+// ─── Gods — each has a ranked list of traits that match it best ───────────────
+// Images are referenced by index (0–4), matching the 5 URLs given by the user.
+// Update `name` and `description` once you know what each god is.
+
+const GODS = [
+  {
+    index: 0,
+    name: "خدای اول",           // ← replace with real name
+    image: "https://iili.io/BptEPCG.md.png",
+    description: "توضیح کوتاه درباره این خدا",  // ← replace
+    traits: ["leadership", "ambition", "decisiveness", "courage"],
+  },
+  {
+    index: 1,
+    name: "خدای دوم",
+    image: "https://iili.io/BptEiGf.md.png",
+    description: "توضیح کوتاه درباره این خدا",
+    traits: ["creativity", "curiosity", "intuition", "independence"],
+  },
+  {
+    index: 2,
+    name: "خدای سوم",
+    image: "https://iili.io/BptE4Qs.md.png",
+    description: "توضیح کوتاه درباره این خدا",
+    traits: ["empathy", "sociability", "loyalty", "adaptability"],
+  },
+  {
+    index: 3,
+    name: "خدای چهارم",
+    image: "https://iili.io/BptEgTX.md.png",
+    description: "توضیح کوتاه درباره این خدا",
+    traits: ["adventurousness", "courage", "competitiveness", "idealism"],
+  },
+  {
+    index: 4,
+    name: "خدای پنجم",
+    image: "https://iili.io/BptEQ3l.md.png",
+    description: "توضیح کوتاه درباره این خدا",
+    traits: ["emotional-control", "patience", "discipline", "responsibility"],
+  },
+];
+
+// Score each god against the player's trait totals, pick the best match
+function pickGod(traitTotals) {
+  let bestGod = GODS[0];
+  let bestScore = -1;
+  for (const god of GODS) {
+    const score = god.traits.reduce((sum, t) => sum + (traitTotals[t] || 0), 0);
+    if (score > bestScore) { bestScore = score; bestGod = god; }
+  }
+  return bestGod;
+}
 
 const POINTS_PER_TRAIT = 2;
 
@@ -234,11 +210,10 @@ function sendQuestion() {
   });
 }
 
-function computeTraits(subjectId) {
+function computeTraitTotals(subjectId) {
   const totals = {};
   Object.entries(answers[subjectId] || {}).forEach(([qIdStr, votes]) => {
-    const qId = parseInt(qIdStr);
-    const question = QUESTIONS.find((q) => q.id === qId);
+    const question = QUESTIONS.find((q) => q.id === parseInt(qIdStr));
     if (!question) return;
     votes.forEach(({ optionIndex }) => {
       const option = question.options[optionIndex];
@@ -248,17 +223,25 @@ function computeTraits(subjectId) {
       });
     });
   });
-  return Object.entries(totals)
-    .map(([slug, points]) => ({ slug, label: TRAIT_LABELS[slug] || slug, points }))
-    .sort((a, b) => b.points - a.points);
+  return totals;
 }
 
 function endRound() {
   const subjectId = subjectQueue[currentSubjectIndex];
+  const traitTotals = computeTraitTotals(subjectId);
+  const god = pickGod(traitTotals);
+
+  // Top traits for display (sorted)
+  const topTraits = Object.entries(traitTotals)
+    .map(([slug, points]) => ({ slug, label: TRAIT_LABELS[slug] || slug, points }))
+    .sort((a, b) => b.points - a.points)
+    .slice(0, 5);
+
   io.emit("roundResult", {
     subjectId,
     subjectName: players[subjectId]?.name ?? "???",
-    traits: computeTraits(subjectId),
+    god,
+    topTraits,
     roundNumber: currentSubjectIndex + 1,
     totalRounds: subjectQueue.length,
   });
@@ -289,7 +272,6 @@ io.on("connection", (socket) => {
     if (answeredThisQuestion.has(socket.id)) return;
 
     answeredThisQuestion.add(socket.id);
-
     if (!answers[subjectId][questionId]) answers[subjectId][questionId] = [];
     answers[subjectId][questionId].push({ voterId: socket.id, optionIndex });
 
@@ -308,19 +290,22 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Any player can advance to next round after seeing results
   socket.on("nextRound", () => {
     currentSubjectIndex += 1;
     if (currentSubjectIndex >= subjectQueue.length) {
-      const summary = subjectQueue.map((id) => ({
-        playerId: id,
-        playerName: players[id]?.name ?? "???",
-        traits: computeTraits(id),
-      }));
+      // All players done — build game-over summary
+      const summary = subjectQueue.map((id) => {
+        const totals = computeTraitTotals(id);
+        return {
+          playerId: id,
+          playerName: players[id]?.name ?? "???",
+          god: pickGod(totals),
+        };
+      });
       io.emit("gameOver", { summary });
       gameActive = false;
     } else {
-      startRound();
+      startRound(); // ← this emits "roundStart" which the client now uses to go back to game screen
     }
   });
 
@@ -334,6 +319,4 @@ io.on("connection", (socket) => {
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, "0.0.0.0", () => {
-  console.log(`Running on ${PORT}`);
-});
+server.listen(PORT, "0.0.0.0", () => console.log(`Running on ${PORT}`));

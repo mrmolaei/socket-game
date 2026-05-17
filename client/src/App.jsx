@@ -3,8 +3,7 @@ import { io } from "socket.io-client";
 
 const socket = io("https://nodejs-production-11bf.up.railway.app");
 
-// ─── Screens ──────────────────────────────────────────────────────────────────
-// "lobby" | "countdown" | "game" | "result" | "gameover"
+// screens: "lobby" | "countdown" | "game" | "result" | "gameover"
 
 export default function App() {
   const [name, setName] = useState("");
@@ -14,37 +13,26 @@ export default function App() {
   const [countdown, setCountdown] = useState(null);
   const [screen, setScreen] = useState("lobby");
 
-  // Round info
   const [roundInfo, setRoundInfo] = useState(null);
-  // { subjectId, subjectName, roundNumber, totalRounds }
-
-  // Current question
   const [question, setQuestion] = useState(null);
-  // { questionIndex, totalQuestions, id, text, options:[{label,text}] }
-
   const [selectedOption, setSelectedOption] = useState(null);
   const [submitted, setSubmitted] = useState(false);
   const [progress, setProgress] = useState({ answered: 0, total: 0 });
 
-  // Round result
+  // { subjectId, subjectName, god, topTraits, roundNumber, totalRounds }
   const [roundResult, setRoundResult] = useState(null);
-  // { subjectId, subjectName, traits:[{slug,label,points}], roundNumber, totalRounds }
 
-  // Game over
+  // { summary: [{ playerId, playerName, god }] }
   const [gameOverData, setGameOverData] = useState(null);
 
-  const myIdRef = useRef(socket.id);
-
-  // ─── Socket events ──────────────────────────────────────────────────────────
+  // ─── Socket listeners ──────────────────────────────────────────────────────
 
   useEffect(() => {
-    myIdRef.current = socket.id;
-
     socket.on("playersUpdate", setPlayers);
 
     socket.on("countdownTick", (value) => {
       setCountdown(value);
-      if (value > 0) setScreen("countdown");
+      setScreen("countdown");
     });
 
     socket.on("countdownAbort", () => {
@@ -56,12 +44,15 @@ export default function App() {
       setScreen("game");
     });
 
+    // ✅ FIX: roundStart now explicitly switches back to "game" screen
     socket.on("roundStart", (info) => {
       setRoundInfo(info);
       setQuestion(null);
       setSelectedOption(null);
       setSubmitted(false);
       setProgress({ answered: 0, total: 0 });
+      setRoundResult(null);
+      setScreen("game"); // ← this was missing — caused the loop to stop visually
     });
 
     socket.on("question", (q) => {
@@ -71,9 +62,7 @@ export default function App() {
       setProgress({ answered: 0, total: 0 });
     });
 
-    socket.on("answerProgress", (p) => {
-      setProgress(p);
-    });
+    socket.on("answerProgress", setProgress);
 
     socket.on("roundResult", (result) => {
       setRoundResult(result);
@@ -86,25 +75,18 @@ export default function App() {
     });
 
     return () => {
-      socket.off("playersUpdate");
-      socket.off("countdownTick");
-      socket.off("countdownAbort");
-      socket.off("gameStart");
-      socket.off("roundStart");
-      socket.off("question");
-      socket.off("answerProgress");
-      socket.off("roundResult");
-      socket.off("gameOver");
+      ["playersUpdate","countdownTick","countdownAbort","gameStart",
+       "roundStart","question","answerProgress","roundResult","gameOver"]
+        .forEach((e) => socket.off(e));
     };
   }, []);
 
-  // ─── Actions ────────────────────────────────────────────────────────────────
+  // ─── Actions ──────────────────────────────────────────────────────────────
 
   const joinLobby = () => {
     if (!name.trim()) return;
     socket.emit("joinLobby", name.trim());
     setJoined(true);
-    myIdRef.current = socket.id;
   };
 
   const toggleReady = () => {
@@ -120,21 +102,19 @@ export default function App() {
     socket.emit("submitAnswer", { questionId: question.id, optionIndex });
   };
 
-  const goNextRound = () => {
-    socket.emit("nextRound");
-  };
+  const goNextRound = () => socket.emit("nextRound");
 
-  // ─── Derived ────────────────────────────────────────────────────────────────
+  // ─── Derived ──────────────────────────────────────────────────────────────
 
   const isSubject = roundInfo?.subjectId === socket.id;
   const readyCount = players.filter((p) => p.ready).length;
 
-  // ─── Render ─────────────────────────────────────────────────────────────────
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <div style={s.page}>
 
-      {/* ══ LOBBY ══════════════════════════════════════════════════════════ */}
+      {/* ══ LOBBY — name entry ══════════════════════════════════════════════ */}
       {screen === "lobby" && !joined && (
         <div style={s.card}>
           <h1 style={s.title}>ورود به لابی</h1>
@@ -144,11 +124,13 @@ export default function App() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && joinLobby()}
+            autoFocus
           />
           <button style={s.btnPrimary} onClick={joinLobby}>ورود</button>
         </div>
       )}
 
+      {/* ══ LOBBY — waiting room ════════════════════════════════════════════ */}
       {screen === "lobby" && joined && (
         <div style={s.card}>
           <h1 style={s.title}>لابی</h1>
@@ -187,10 +169,8 @@ export default function App() {
 
       {/* ══ COUNTDOWN ══════════════════════════════════════════════════════ */}
       {screen === "countdown" && (
-        <div style={s.centerFull}>
-          <div style={s.bigNumber} key={countdown}>
-            {countdown === 0 ? "بریم!" : countdown}
-          </div>
+        <div style={s.fullCenter}>
+          <div style={s.bigNumber}>{countdown === 0 ? "بریم!" : countdown}</div>
           <p style={s.hint}>بازی شروع می‌شود…</p>
         </div>
       )}
@@ -198,25 +178,22 @@ export default function App() {
       {/* ══ GAME ═══════════════════════════════════════════════════════════ */}
       {screen === "game" && (
         <div style={s.card}>
-          {/* Round header */}
           {roundInfo && (
             <div style={s.roundBanner}>
               <span style={s.roundLabel}>
                 دور {roundInfo.roundNumber} از {roundInfo.totalRounds}
               </span>
-              <span style={s.subjectTag}>
-                درباره‌ی <strong>{roundInfo.subjectName}</strong> پاسخ دهید
-              </span>
+              <p style={s.subjectTag}>
+                درباره‌ی <strong style={s.accent}>{roundInfo.subjectName}</strong> پاسخ دهید
+              </p>
             </div>
           )}
 
-          {/* Subject sees a waiting screen */}
+          {/* Subject: waiting screen */}
           {isSubject && (
-            <div style={s.centerFull}>
-              <div style={s.waitingIcon}>👁️</div>
-              <p style={s.waitingText}>
-                بقیه دارند درباره‌ی شما پاسخ می‌دهند…
-              </p>
+            <div style={s.fullCenter}>
+              <div style={{ fontSize: "3.5rem" }}>👁️</div>
+              <p style={s.waitingText}>بقیه دارند درباره‌ی شما پاسخ می‌دهند…</p>
               {question && (
                 <p style={s.meta}>
                   سوال {question.questionIndex + 1} از {question.totalQuestions}
@@ -226,7 +203,7 @@ export default function App() {
             </div>
           )}
 
-          {/* Voters see the question */}
+          {/* Voters: question */}
           {!isSubject && question && (
             <>
               <p style={s.questionMeta}>
@@ -253,91 +230,114 @@ export default function App() {
               </div>
 
               {submitted && (
-                <div style={s.waitingOthers}>
+                <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "0.5rem", alignItems: "center" }}>
                   <ProgressBar answered={progress.answered} total={progress.total} />
-                  <p style={s.hint}>
-                    {progress.answered}/{progress.total} نفر پاسخ دادند
-                  </p>
+                  <p style={s.hint}>{progress.answered}/{progress.total} نفر پاسخ دادند</p>
                 </div>
               )}
             </>
           )}
 
-          {/* No question yet (transitioning between questions) */}
           {!isSubject && !question && (
-            <p style={{ ...s.hint, marginTop: "3rem" }}>در حال بارگذاری سوال…</p>
+            <p style={{ ...s.hint, margin: "3rem 0" }}>در حال بارگذاری سوال…</p>
           )}
         </div>
       )}
 
-      {/* ══ ROUND RESULT ═══════════════════════════════════════════════════ */}
+      {/* ══ ROUND RESULT — god reveal ═══════════════════════════════════════ */}
       {screen === "result" && roundResult && (
-        <div style={s.card}>
-          <p style={s.roundLabel}>
-            دور {roundResult.roundNumber} از {roundResult.totalRounds}
-          </p>
-          <h2 style={s.resultTitle}>
-            ویژگی‌های <span style={s.accent}>{roundResult.subjectName}</span>
-            <br />
-            <span style={s.resultSub}>از نظر دوستانش</span>
-          </h2>
-
-          <TraitBars traits={roundResult.traits} />
-
-          <button style={s.btnPrimary} onClick={goNextRound}>
-            {roundResult.roundNumber < roundResult.totalRounds
-              ? "دور بعدی →"
-              : "نتیجه نهایی →"}
-          </button>
-        </div>
+        <GodReveal
+          result={roundResult}
+          onNext={goNextRound}
+        />
       )}
 
       {/* ══ GAME OVER ══════════════════════════════════════════════════════ */}
       {screen === "gameover" && gameOverData && (
-        <div style={{ ...s.card, maxWidth: 600 }}>
-          <h1 style={s.title}>نتیجه نهایی 🎉</h1>
-          {gameOverData.summary.map((entry) => (
-            <div key={entry.playerId} style={s.summaryBlock}>
-              <h3 style={s.summaryName}>{entry.playerName}</h3>
-              <TraitBars traits={entry.traits.slice(0, 5)} />
-            </div>
-          ))}
-        </div>
+        <GameOver data={gameOverData} myId={socket.id} />
       )}
     </div>
   );
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── God Reveal screen ────────────────────────────────────────────────────────
+
+function GodReveal({ result, onNext }) {
+  const { subjectName, god, topTraits, roundNumber, totalRounds } = result;
+  const [revealed, setRevealed] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setRevealed(true), 300);
+    return () => clearTimeout(t);
+  }, []);
+
+  return (
+    <div style={s.godPage}>
+      <p style={s.roundLabel}>دور {roundNumber} از {totalRounds}</p>
+
+      <p style={s.godSubtitle}>
+        <span style={s.accent}>{subjectName}</span> شبیه این خداست:
+      </p>
+
+      {/* God image */}
+      <div style={{ ...s.godImageWrap, opacity: revealed ? 1 : 0, transform: revealed ? "scale(1)" : "scale(0.85)" }}>
+        <img
+          src={god.image}
+          alt={god.name}
+          style={s.godImage}
+        />
+      </div>
+
+      <h2 style={s.godName}>{god.name}</h2>
+      <p style={s.godDesc}>{god.description}</p>
+
+      {/* Top traits as pills */}
+      <div style={s.traitPills}>
+        {topTraits.slice(0, 4).map((t) => (
+          <span key={t.slug} style={s.pill}>{t.label}</span>
+        ))}
+      </div>
+
+      <button style={s.btnPrimary} onClick={onNext}>
+        {roundNumber < totalRounds ? "دور بعدی ←" : "نتیجه نهایی ←"}
+      </button>
+    </div>
+  );
+}
+
+// ─── Game Over screen ─────────────────────────────────────────────────────────
+
+function GameOver({ data, myId }) {
+  return (
+    <div style={{ ...s.card, maxWidth: 560, gap: "1.5rem" }}>
+      <h1 style={s.title}>🎉 پایان بازی</h1>
+
+      {data.summary.map((entry) => (
+        <div key={entry.playerId} style={s.summaryBlock}>
+          <div style={s.summaryLeft}>
+            <img src={entry.god.image} alt={entry.god.name} style={s.summaryImg} />
+          </div>
+          <div style={s.summaryRight}>
+            <p style={s.summaryPlayer}>
+              {entry.playerName}
+              {entry.playerId === myId && <span style={s.youBadge}> (شما)</span>}
+            </p>
+            <p style={s.summaryGodName}>{entry.god.name}</p>
+            <p style={s.summaryGodDesc}>{entry.god.description}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Progress bar ─────────────────────────────────────────────────────────────
 
 function ProgressBar({ answered, total }) {
   const pct = total > 0 ? Math.round((answered / total) * 100) : 0;
   return (
     <div style={s.progressTrack}>
       <div style={{ ...s.progressFill, width: `${pct}%` }} />
-    </div>
-  );
-}
-
-function TraitBars({ traits }) {
-  if (!traits || traits.length === 0) return null;
-  const max = traits[0].points;
-  return (
-    <div style={s.traitList}>
-      {traits.map((t) => (
-        <div key={t.slug} style={s.traitRow}>
-          <span style={s.traitLabel}>{t.label}</span>
-          <div style={s.traitTrack}>
-            <div
-              style={{
-                ...s.traitFill,
-                width: `${Math.round((t.points / max) * 100)}%`,
-              }}
-            />
-          </div>
-          <span style={s.traitPoints}>{t.points}</span>
-        </div>
-      ))}
     </div>
   );
 }
@@ -357,7 +357,6 @@ const s = {
     direction: "rtl",
   },
   card: {
-    position: "relative",
     width: "100%",
     maxWidth: 480,
     background: "#1a1d2e",
@@ -373,11 +372,15 @@ const s = {
     margin: 0,
     fontSize: "2rem",
     fontWeight: 800,
-    background: "linear-gradient(135deg, #7efff5, #00b4d8)",
+    background: "linear-gradient(135deg, #f5c842, #e07b39)",
     WebkitBackgroundClip: "text",
     WebkitTextFillColor: "transparent",
   },
-  meta: { margin: 0, fontSize: "0.8rem", color: "#6b7280", letterSpacing: "0.05em" },
+  accent: { color: "#f5c842" },
+  meta: { margin: 0, fontSize: "0.8rem", color: "#6b7280" },
+  hint: { margin: 0, fontSize: "0.85rem", color: "#6b7280", textAlign: "center" },
+
+  // Lobby
   input: {
     width: "100%",
     padding: "0.75rem 1rem",
@@ -397,7 +400,7 @@ const s = {
     fontWeight: 700,
     borderRadius: 10,
     border: "none",
-    background: "#00b4d8",
+    background: "linear-gradient(135deg, #f5c842, #e07b39)",
     color: "#0f1117",
     cursor: "pointer",
   },
@@ -407,152 +410,109 @@ const s = {
     fontSize: "1rem",
     fontWeight: 700,
     borderRadius: 10,
-    border: "2px solid #00b4d8",
+    border: "2px solid #f5c842",
     background: "transparent",
-    color: "#7efff5",
+    color: "#f5c842",
     cursor: "pointer",
   },
-  btnReadyActive: { background: "#00b4d8", color: "#0f1117" },
-  hint: { margin: 0, fontSize: "0.85rem", color: "#6b7280", textAlign: "center" },
-  playerList: {
-    listStyle: "none",
-    margin: 0,
-    padding: 0,
-    width: "100%",
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.5rem",
+  btnReadyActive: {
+    background: "linear-gradient(135deg, #f5c842, #e07b39)",
+    color: "#0f1117",
+    border: "2px solid transparent",
   },
+  playerList: { listStyle: "none", margin: 0, padding: 0, width: "100%", display: "flex", flexDirection: "column", gap: "0.5rem" },
   playerRow: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "0.65rem 1rem",
-    borderRadius: 10,
-    background: "#12141f",
-    border: "1px solid #24273a",
+    display: "flex", alignItems: "center", justifyContent: "space-between",
+    padding: "0.65rem 1rem", borderRadius: 10, background: "#12141f", border: "1px solid #24273a",
   },
   playerName: { fontWeight: 600 },
   youBadge: { fontWeight: 400, fontSize: "0.8rem", color: "#6b7280" },
   badge: { fontSize: "0.75rem", fontWeight: 700, padding: "0.2rem 0.6rem", borderRadius: 999 },
-  badgeOn: { background: "#00b4d820", color: "#7efff5", border: "1px solid #00b4d8" },
+  badgeOn: { background: "#f5c84220", color: "#f5c842", border: "1px solid #f5c842" },
   badgeOff: { background: "#ffffff08", color: "#6b7280", border: "1px solid #2a2d42" },
 
-  centerFull: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "1rem",
-    minHeight: "60vh",
-    textAlign: "center",
+  // Countdown
+  fullCenter: {
+    display: "flex", flexDirection: "column", alignItems: "center",
+    justifyContent: "center", gap: "1rem", minHeight: "70vh", textAlign: "center", width: "100%",
   },
   bigNumber: {
-    fontSize: "9rem",
-    fontWeight: 900,
-    lineHeight: 1,
-    background: "linear-gradient(135deg, #7efff5, #00b4d8)",
-    WebkitBackgroundClip: "text",
-    WebkitTextFillColor: "transparent",
+    fontSize: "10rem", fontWeight: 900, lineHeight: 1,
+    background: "linear-gradient(135deg, #f5c842, #e07b39)",
+    WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
   },
 
-  // Round banner
+  // Game
   roundBanner: {
+    width: "100%", display: "flex", flexDirection: "column", alignItems: "center",
+    gap: "0.2rem", borderBottom: "1px solid #2a2d42", paddingBottom: "1rem",
+  },
+  roundLabel: { fontSize: "0.7rem", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.1em", margin: 0 },
+  subjectTag: { fontSize: "1rem", color: "#e8eaf0", margin: 0 },
+  waitingText: { fontSize: "1.1rem", color: "#94a3b8", textAlign: "center" },
+  questionMeta: { margin: 0, fontSize: "0.75rem", color: "#6b7280", alignSelf: "flex-start" },
+  questionText: { margin: 0, fontSize: "1.05rem", fontWeight: 600, lineHeight: 1.7, textAlign: "right" },
+  optionList: { width: "100%", display: "flex", flexDirection: "column", gap: "0.6rem" },
+  optionBtn: {
+    display: "flex", alignItems: "flex-start", gap: "0.75rem",
+    width: "100%", padding: "0.85rem 1rem", borderRadius: 12,
+    border: "1px solid #2a2d42", background: "#12141f", color: "#e8eaf0",
+    cursor: "pointer", textAlign: "right", fontSize: "0.95rem",
+  },
+  optionSelected: { border: "1px solid #f5c842", background: "#1f1a0d" },
+  optionDisabled: { opacity: 0.35, cursor: "default" },
+  optionLabel: { fontWeight: 700, color: "#f5c842", minWidth: 28, flexShrink: 0 },
+  optionText: { lineHeight: 1.5 },
+  progressTrack: { width: "100%", height: 6, background: "#24273a", borderRadius: 999, overflow: "hidden" },
+  progressFill: { height: "100%", background: "linear-gradient(90deg, #f5c842, #e07b39)", borderRadius: 999, transition: "width 0.4s ease" },
+
+  // God reveal
+  godPage: {
     width: "100%",
+    maxWidth: 420,
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: "0.25rem",
-    borderBottom: "1px solid #2a2d42",
-    paddingBottom: "1rem",
+    gap: "1.1rem",
+    textAlign: "center",
   },
-  roundLabel: { fontSize: "0.75rem", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.1em" },
-  subjectTag: { fontSize: "1rem", color: "#e8eaf0" },
-
-  // Subject waiting
-  waitingIcon: { fontSize: "3rem" },
-  waitingText: { fontSize: "1.1rem", color: "#94a3b8", textAlign: "center" },
-
-  // Question
-  questionMeta: { margin: 0, fontSize: "0.75rem", color: "#6b7280", alignSelf: "flex-start" },
-  questionText: {
-    margin: 0,
-    fontSize: "1.05rem",
-    fontWeight: 600,
-    lineHeight: 1.7,
-    textAlign: "right",
-    color: "#e8eaf0",
-  },
-  optionList: { width: "100%", display: "flex", flexDirection: "column", gap: "0.6rem" },
-  optionBtn: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "0.75rem",
-    width: "100%",
-    padding: "0.85rem 1rem",
-    borderRadius: 12,
-    border: "1px solid #2a2d42",
-    background: "#12141f",
-    color: "#e8eaf0",
-    cursor: "pointer",
-    textAlign: "right",
-    fontSize: "0.95rem",
-    transition: "border-color 0.2s",
-  },
-  optionSelected: { border: "1px solid #00b4d8", background: "#0d1f2d" },
-  optionDisabled: { opacity: 0.4, cursor: "default" },
-  optionLabel: { fontWeight: 700, color: "#00b4d8", minWidth: 28, flexShrink: 0 },
-  optionText: { lineHeight: 1.5 },
-
-  waitingOthers: { width: "100%", display: "flex", flexDirection: "column", gap: "0.5rem", alignItems: "center" },
-
-  // Progress bar
-  progressTrack: {
-    width: "100%",
-    height: 6,
-    background: "#24273a",
-    borderRadius: 999,
+  godSubtitle: { margin: 0, fontSize: "1.05rem", color: "#94a3b8" },
+  godImageWrap: {
+    width: 260,
+    height: 260,
+    borderRadius: "50%",
     overflow: "hidden",
+    border: "3px solid #f5c84260",
+    boxShadow: "0 0 60px #f5c84230",
+    transition: "opacity 0.6s ease, transform 0.6s ease",
+    flexShrink: 0,
   },
-  progressFill: {
-    height: "100%",
-    background: "linear-gradient(90deg, #7efff5, #00b4d8)",
-    borderRadius: 999,
-    transition: "width 0.4s ease",
+  godImage: { width: "100%", height: "100%", objectFit: "cover" },
+  godName: {
+    margin: 0, fontSize: "1.8rem", fontWeight: 800,
+    background: "linear-gradient(135deg, #f5c842, #e07b39)",
+    WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
   },
-
-  // Result
-  resultTitle: { margin: 0, fontSize: "1.4rem", fontWeight: 700, textAlign: "center", lineHeight: 1.6 },
-  resultSub: { fontSize: "0.85rem", fontWeight: 400, color: "#6b7280" },
-  accent: { color: "#7efff5" },
-
-  // Trait bars
-  traitList: { width: "100%", display: "flex", flexDirection: "column", gap: "0.65rem" },
-  traitRow: { display: "flex", alignItems: "center", gap: "0.75rem" },
-  traitLabel: { fontSize: "0.85rem", minWidth: 110, textAlign: "right", color: "#94a3b8" },
-  traitTrack: {
-    flex: 1,
-    height: 8,
-    background: "#24273a",
-    borderRadius: 999,
-    overflow: "hidden",
+  godDesc: { margin: 0, fontSize: "0.95rem", color: "#94a3b8", lineHeight: 1.7, maxWidth: 360 },
+  traitPills: { display: "flex", flexWrap: "wrap", gap: "0.5rem", justifyContent: "center" },
+  pill: {
+    padding: "0.3rem 0.9rem", borderRadius: 999, fontSize: "0.8rem", fontWeight: 600,
+    background: "#f5c84218", color: "#f5c842", border: "1px solid #f5c84250",
   },
-  traitFill: {
-    height: "100%",
-    background: "linear-gradient(90deg, #7efff5, #00b4d8)",
-    borderRadius: 999,
-    transition: "width 0.6s ease",
-  },
-  traitPoints: { fontSize: "0.8rem", color: "#6b7280", minWidth: 28, textAlign: "left" },
 
   // Game over
   summaryBlock: {
-    width: "100%",
-    borderTop: "1px solid #2a2d42",
-    paddingTop: "1rem",
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.75rem",
+    width: "100%", display: "flex", alignItems: "center", gap: "1rem",
+    borderTop: "1px solid #2a2d42", paddingTop: "1rem",
   },
-  summaryName: { margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "#7efff5" },
+  summaryLeft: { flexShrink: 0 },
+  summaryImg: { width: 72, height: 72, borderRadius: "50%", objectFit: "cover", border: "2px solid #f5c84260" },
+  summaryRight: { display: "flex", flexDirection: "column", gap: "0.2rem", textAlign: "right" },
+  summaryPlayer: { margin: 0, fontSize: "0.85rem", color: "#6b7280" },
+  summaryGodName: {
+    margin: 0, fontSize: "1.2rem", fontWeight: 700,
+    background: "linear-gradient(135deg, #f5c842, #e07b39)",
+    WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+  },
+  summaryGodDesc: { margin: 0, fontSize: "0.8rem", color: "#6b7280", lineHeight: 1.5 },
 };
