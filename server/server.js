@@ -71,41 +71,11 @@ const TRAIT_LABELS = {
 // Update `name` and `description` once you know what each god is.
 
 const GODS = [
-  {
-    index: 0,
-    name: "خدای اول",           // ← replace with real name
-    image: "https://iili.io/BptEPCG.md.png",
-    description: "توضیح کوتاه درباره این خدا",  // ← replace
-    traits: ["leadership", "ambition", "decisiveness", "courage"],
-  },
-  {
-    index: 1,
-    name: "خدای دوم",
-    image: "https://iili.io/BptEiGf.md.png",
-    description: "توضیح کوتاه درباره این خدا",
-    traits: ["creativity", "curiosity", "intuition", "independence"],
-  },
-  {
-    index: 2,
-    name: "خدای سوم",
-    image: "https://iili.io/BptE4Qs.md.png",
-    description: "توضیح کوتاه درباره این خدا",
-    traits: ["empathy", "sociability", "loyalty", "adaptability"],
-  },
-  {
-    index: 3,
-    name: "خدای چهارم",
-    image: "https://iili.io/BptEgTX.md.png",
-    description: "توضیح کوتاه درباره این خدا",
-    traits: ["adventurousness", "courage", "competitiveness", "idealism"],
-  },
-  {
-    index: 4,
-    name: "خدای پنجم",
-    image: "https://iili.io/BptEQ3l.md.png",
-    description: "توضیح کوتاه درباره این خدا",
-    traits: ["emotional-control", "patience", "discipline", "responsibility"],
-  },
+  { id: "zeus", name: "زئوس", description: "خدای خدایان", traits: ["leadership", "ambition", "decisiveness", "courage"] },
+  { id: "kronos",    name: "کرونوس", description: "پدر زئوس و بزرگترین تایتان", traits: ["creativity", "curiosity", "intuition", "independence"] },
+  { id: "perso",  name: "پرسفونه", description: "همسر زئوس و خدای عشق", traits: ["empathy", "sociability", "loyalty", "adaptability"] },
+  { id: "hades",  name: "هادس", description: "خدای مردگان", traits: ["adventurousness", "courage", "competitiveness", "idealism"] },
+  { id: "poseidon",    name: "پوزیدون", description: "خدای دریاها", traits: ["emotional-control", "patience", "discipline", "responsibility"] },
 ];
 
 // Score each god against the player's trait totals, pick the best match

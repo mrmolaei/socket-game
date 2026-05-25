@@ -1,7 +1,20 @@
 import { useEffect, useState, useRef } from "react";
 import { io } from "socket.io-client";
+import zeus from "./assets/zeus.png";
+import kronos from "./assets/kronos.png";
+import perso from "./assets/personefe.png";
+import hades from "./assets/hades.png";
+import poseidon from "./assets/poseidon.png";
 
 const socket = io("https://nodejs-production-11bf.up.railway.app");
+
+const GOD_ASSETS = {
+  zeus: { image: zeus },
+  kronos:    { image: kronos },
+  perso:    { image: perso },
+  hades:    { image: hades },
+  poseidon:    { image: poseidon }
+};
 
 // screens: "lobby" | "countdown" | "game" | "result" | "gameover"
 
@@ -284,7 +297,7 @@ function GodReveal({ result, onNext }) {
         <img
           src={god.image}
           alt={god.name}
-          style={s.godImage}
+          style={GOD_ASSETS[god.id]}
         />
       </div>
 
